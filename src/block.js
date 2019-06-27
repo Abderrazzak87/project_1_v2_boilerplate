@@ -50,7 +50,7 @@ class Block {
 
             // Reevaluate the varaible hash with the hash stored earlier
             self.hash = auxiliaryHash;
-            
+
             // Comparing if the hashes changed
             if (auxiliaryHash == hashBlock) {
               // Returning the Block is not valid
@@ -75,9 +75,6 @@ class Block {
      */
     getBData() {
 
-
-        // Buffer.from(encodedBlockData, 'hex').toString();
-
         // Resolve with the data if the object isn't the Genesis block
 
 
@@ -90,16 +87,13 @@ class Block {
           // Decoding the data to retrieve the JSON representation of the object
           // Parse the data to an object to be retrieve.
           var decodedBlockData =  JSON.parse(hex2ascii(encodedBlockData.toString())) ;
-          var genesisBlockData =  JSON.stringify({data: 'Genesis Block'}) ;
 
-          if (JSON.stringify(decodedBlockData).toString() !=  genesisBlockData.toString()) {
-            // Returning the Block is not valid
+          // Skip the Genesis block
+          if (self.height != 0) {
+            // Returning the decoded data of the block
             resolve(decodedBlockData);
           }
-          else {
-            // Returning the Block is valid
-            reject("The Block is not valid");
-          }
+          //reject(null)
 
         });
 

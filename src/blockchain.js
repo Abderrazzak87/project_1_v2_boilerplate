@@ -73,18 +73,18 @@ class Blockchain {
           // UTC timestamp
           block.time = new Date().getTime().toString().slice(0,-3);
 
-          // bloc previous hashes
-          if (this.height != -1 ){
+          // Skip the Genesis block - set block previous hash
+          if (self.height != -1 ){
             block.previousBlockHash = this.chain[this.chain.length - 1].hash;
           }
 
-          // bloc hash
+          // blocK hash
           block.hash = SHA256(JSON.stringify(block)).toString();
 
           // update this.height
-          this.height = this.height +1;
+          self.height = this.height +1;
           // add block to chain
-          this.chain.push(block);
+          self.chain.push(block);
 
           resolve(block);
           reject('error adding a block');
@@ -132,16 +132,16 @@ class Blockchain {
           let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
           let timeDiff = currentTime - messageTime;
 
-
           if (timeDiff <= TIME_INTERVAL){
-            bitcoinMessage.verify(message, address, signature);
-            let block = new BlockClass.Block({
-              owner: address,
-              star: star
-            });
-
-            this._addBlock(block);
-            resolve(block) ;
+            let verified = bitcoinMessage.verify(message, address, signature);
+            if (verified) {
+              let block = new BlockClass.Block({owner: address,  star: star});
+              self._addBlock(block);
+              resolve(block) ;
+            }
+            else{
+              reject('Please verify the message signature');
+            }
           }
           else {
             reject('The time elpased since the message request is greater than 5 minutes');
@@ -165,7 +165,6 @@ class Blockchain {
           let block = self.chain.filter(value => value.hash === hash.toString())[0];
 
           if (block){
-            console.log(block.hash);
             resolve(block);
           }
           else {
@@ -203,45 +202,18 @@ class Blockchain {
 
         return new Promise( (resolve, reject) =>  {
 
-          /**
-          * Declacr an async function to look for the address in the
-          * BlockChain using filter array function
-          */
-          const getStarsList = async () => {
-          let starList = [];
-          let blockData = null;
-          let blockList = self.chain.filter(async function(value) {
+          self.chain.forEach( (block) => {
 
-            //Skip the Genesis Block
-            if (value.height == 0){
-              return false;
-            }
-            else {
-               blockData = await value.getBData();
+              block.getBData().then((data) => {
+              if(data.owner === address){
+                stars.push(data);
+              }
+            }).catch((error) => {console.log(error)});
 
-              if (blockData.owner == address){
-                await starList.push({owner: blockData.owner,
-                                  star: blockData.star});
-              }
-              else{
-                return false;
-              }
-            }
           });
 
-            return starList;
-          };
-
-
-
-          stars =  getStarsList() ;
-          if (stars.length != 0){
-            resolve(stars);
-          }
-          else {
-            reject('This owner address does not have any star in this BlockChain');
-          }
-
+          resolve(stars);
+          reject('This owner address does not have any star in this BlockChain');
         });
     }
 
@@ -255,51 +227,20 @@ class Blockchain {
         let self = this;
         let errorLog = [];
         return new Promise( async (resolve, reject) => {
+          for(let item of self.chain){
 
-          /**
-          * Declacr an async function to brows the blockchain sequentially
-          */
-          const browsBlockchain =  async () => {
-            var i;
-            let preErrorLog = [];
-            let chainLength = await self.getChainHeight() ;
+            // skip the Genesis blocK
+            if (item.height > 0){
 
-            for (i = 0; i <= chainLength; i++) {
+              await item.validate().then((result) => {
+                if(item.previousBlockHash != self.chain[item.height - 1].hash)
+                   errorLog.push("The previous hash of the block " + item.height + " is not equal to the hash of its previous block");
+                }).catch((error) => {errorLog.push("The block number " + item.height  + " is not valide")});
+            }
+          }
 
-                let blockPosition = i;
-                let  previousBlockHash = '';
-                self.getBlockByHeight(i).then((currentBlock) => {
-                    previousBlockHash = currentBlock.previousBlockHash;
-                    currentBlock.validate().then((result) => {
-                    }).catch((error) => {preErrorLog.push("The block number " + blockPosition  + " is not valide")});
-
-                    // validate the previousHash of the currentBlock
-                    // Skip  the Genesis block witch does not have a previous hash
-                    if (i > 0) {
-
-                        self.getBlockByHeight(blockPosition - 1).then((previousBlock) => {
-                          if (previousBlock.hash != previousBlockHash){
-                             preErrorLog.push("The previous hash of the block " + blockPosition  + " is not equal to the hash of its previous block")
-                          }
-                        }).catch((error) => {preErrorLog.push("The block number " + blockPosition - 1 + " is not valide")});
-
-                    }
-
-                }).catch((error) => {preErrorLog.push("The block number " + blockPosition  + " is not valide")});
-              }
-
-            return preErrorLog;
-          };
-
-          errorLog = await browsBlockchain() ;
-
-         if (errorLog.length == 0){
-           resolve('This BlockChain is correct');
-         }
-         else {
-           reject(errorLog);
-         }
-
+          resolve(errorLog);
+          reject(errorLog);
         });
     }
 
